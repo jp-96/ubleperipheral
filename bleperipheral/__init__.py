@@ -1,1 +1,1 @@
-from ble_peripheral import BLEPeripheral
+from bleperipheral.ble_peripheral import BLEPeripheral
