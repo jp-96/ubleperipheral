@@ -1,2 +1,4 @@
-# upy_bleperipheral
-Simple Bluetooth LE peripheral library for Micropython, esp32.
+# bleperipheral
+Simple Bluetooth LE peripheral package for Micropython, esp32.
+
+
