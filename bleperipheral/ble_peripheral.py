@@ -23,15 +23,17 @@ class UnbuildError(Exception):
     pass
 
 class BLEPeripheral:
-    def __init__(self, ble=None):
+    def __init__(self, ble=None, multi_connections = 0):
         self._a_lock = _thread.allocate_lock()
         if ble:
             self._ble = ble
         else:
             self._ble = bluetooth.BLE()
         self._connections = set()
+        self._multi_connections = multi_connections
         self._auto_advertise = True
-        
+        self._advertising = False
+
         self._handlerCentralConnectType = _TYPE_NONE
         self._handlerCentralConnect = None
         self._handlerCentralDisconnectType = _TYPE_NONE
@@ -110,44 +112,47 @@ class BLEPeripheral:
             handlerGattsWrite = None
         self._handlerGattsWrite = handlerGattsWrite
 
-    def _cb(self, arg):
-        event = arg[0]
-        if event == _IRQ_GATTS_WRITE:
-            if self._handlerGattsWriteType == _TYPE_FUNCTION:
-                self._handlerGattsWrite(self, arg[1][0], arg[1][1], arg[1][2])
-            elif self._handlerGattsWriteType == _TYPE_BOUND_METHOD:
-                self._handlerGattsWrite(arg[1][0], arg[1][1], arg[1][2])
-            elif self._handlerGattsWriteType == _TYPE_GENERATOR:
-                coro = self._handlerGattsWrite(self, arg[1][0], arg[1][1], arg[1][2])
-                loop = asyncio.get_event_loop()
-                loop.create_task(coro)
-        elif event == _IRQ_CENTRAL_CONNECT:
-            if self._handlerCentralConnectType == _TYPE_FUNCTION:
-                self._handlerCentralConnect(self, arg[1][0])
-            elif self._handlerCentralConnectType == _TYPE_BOUND_METHOD:
-                self._handlerCentralConnect(arg[1][0])
-            elif self._handlerCentralConnectType == _TYPE_GENERATOR:
-                coro = self._handlerCentralConnect(self, arg[1][0])
-                loop = asyncio.get_event_loop()
-                loop.create_task(coro)
-        elif event == _IRQ_CENTRAL_DISCONNECT:
-            if self._handlerCentralDisconnectType == _TYPE_FUNCTION:
-                self._handlerCentralDisconnect(self, arg[1][0])
-            elif self._handlerCentralDisconnectType == _TYPE_BOUND_METHOD:
-                self._handlerCentralDisconnect(arg[1][0])
-            elif self._handlerCentralDisconnectType == _TYPE_GENERATOR:
-                coro = self._handlerCentralDisconnect(self, arg[1][0])
-                loop = asyncio.get_event_loop()
-                loop.create_task(coro)
+    def _cb_on_central_connect(self, arg):
+        (conn_handle,)=arg
+        if self._handlerCentralConnectType == _TYPE_FUNCTION:
+            self._handlerCentralConnect(self, conn_handle)
+        elif self._handlerCentralConnectType == _TYPE_BOUND_METHOD:
+            self._handlerCentralConnect(conn_handle)
+        elif self._handlerCentralConnectType == _TYPE_GENERATOR:
+            coro = self._handlerCentralConnect(self, conn_handle)
+            loop = asyncio.get_event_loop()
+            loop.create_task(coro)
+
+    def _cb_on_central_disconnect(self, arg):
+        (conn_handle,)=arg
+        if self._handlerCentralDisconnectType == _TYPE_FUNCTION:
+            self._handlerCentralDisconnect(self, conn_handle)
+        elif self._handlerCentralDisconnectType == _TYPE_BOUND_METHOD:
+            self._handlerCentralDisconnect(conn_handle)
+        elif self._handlerCentralDisconnectType == _TYPE_GENERATOR:
+            coro = self._handlerCentralDisconnect(self, conn_handle)
+            loop = asyncio.get_event_loop()
+            loop.create_task(coro)
     
+    def _cb_on_gatts_write(self, arg):
+        (conn_handle, value_handler, value,)=arg
+        if self._handlerGattsWriteType == _TYPE_FUNCTION:
+            self._handlerGattsWrite(self, conn_handle, value_handler, value)
+        elif self._handlerGattsWriteType == _TYPE_BOUND_METHOD:
+            self._handlerGattsWrite(conn_handle, value_handler, value)
+        elif self._handlerGattsWriteType == _TYPE_GENERATOR:
+            coro = self._handlerGattsWrite(self, conn_handle, value_handler, value)
+            loop = asyncio.get_event_loop()
+            loop.create_task(coro)
+
     def _irq_on_central_connect(self, conn_handle):
-        micropython.schedule(self._cb, (_IRQ_CENTRAL_CONNECT, (conn_handle,)))
+        micropython.schedule(self._cb_on_central_connect, (conn_handle,))
 
     def _irq_on_central_disconnect(self, conn_handle):
-        micropython.schedule(self._cb, (_IRQ_CENTRAL_DISCONNECT, (conn_handle,)))
+        micropython.schedule(self._cb_on_central_disconnect, (conn_handle,))
 
     def _irq_on_gatts_write(self, conn_handle, value_handle, value):
-        micropython.schedule(self._cb, (_IRQ_GATTS_WRITE, (conn_handle, value_handle, value,)))
+        micropython.schedule(self._cb_on_gatts_write, (conn_handle, value_handle, value,))
 
     def _irq(self, event, data):
         # Track connections so we can send notifications.
@@ -155,7 +160,10 @@ class BLEPeripheral:
             conn_handle, _, _, = data
             with self._a_lock:
                 self._connections.add(conn_handle)
+                self._advertising = False
             self._irq_on_central_connect(conn_handle)
+            if self._auto_advertise:
+                self.advertise()
         elif event == _IRQ_CENTRAL_DISCONNECT:
             conn_handle, _, _, = data
             with self._a_lock:
@@ -177,7 +185,10 @@ class BLEPeripheral:
     def advertise(self, interval_us=500000, auto_advertise=True):
         if self._payload:
             self._auto_advertise = auto_advertise
-            self._ble.gap_advertise(interval_us, adv_data=self._payload)
+            with self._a_lock:
+                if not self._advertising and (self._multi_connections<0 or len(self._connections)<=self._multi_connections):
+                    self._ble.gap_advertise(interval_us, adv_data=self._payload)
+                    self._advertising = True
         else:
             raise UnbuildError()
 
