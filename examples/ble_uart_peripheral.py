@@ -1,8 +1,8 @@
 # This example demonstrates a peripheral implementing the Nordic UART Service (NUS).
 
 import bluetooth
-from ble_advertising import advertising_payload
-
+#from ble_advertising import advertising_payload
+from bleperipheral import BLEPeripheral
 from micropython import const
 
 _IRQ_CENTRAL_CONNECT = const(1 << 0)
@@ -28,43 +28,29 @@ _ADV_APPEARANCE_GENERIC_COMPUTER = const(128)
 
 
 class BLEUART:
-    def __init__(self, ble, name="mpy-uart", rxbuf=100):
-        self._ble = ble
-        self._ble.active(True)
-        self._ble.irq(handler=self._irq)
-        ((self._tx_handle, self._rx_handle,),) = self._ble.gatts_register_services(
-            (_UART_SERVICE,)
+    def __init__(self, name="upy-uart", rxbuf=100):
+        self._bleperipheral = BLEPeripheral()
+        # Optionally add services=[_UART_UUID], but this is likely to make the payload too large.
+        ((self._tx_handle, self._rx_handle,),) = self._bleperipheral.build(
+            (_UART_SERVICE,),
+            adv_name=name,
+            adv_appearance=_ADV_APPEARANCE_GENERIC_COMPUTER
         )
         # Increase the size of the rx buffer and enable append mode.
-        self._ble.gatts_set_buffer(self._rx_handle, rxbuf, True)
-        self._connections = set()
+        self._bleperipheral.gatts_set_buffer(self._rx_handle, rxbuf, True)
         self._rx_buffer = bytearray()
-        self._handler = None
-        # Optionally add services=[_UART_UUID], but this is likely to make the payload too large.
-        self._payload = advertising_payload(name=name, appearance=_ADV_APPEARANCE_GENERIC_COMPUTER)
-        self._advertise()
+        self._bleperipheral.irq(handlerGattsWrite=self._gattsWrite)
+        self._bleperipheral.advertise()
 
     def irq(self, handler):
         self._handler = handler
-
-    def _irq(self, event, data):
-        # Track connections so we can send notifications.
-        if event == _IRQ_CENTRAL_CONNECT:
-            conn_handle, _, _, = data
-            self._connections.add(conn_handle)
-        elif event == _IRQ_CENTRAL_DISCONNECT:
-            conn_handle, _, _, = data
-            if conn_handle in self._connections:
-                self._connections.remove(conn_handle)
-            # Start advertising again to allow a new connection.
-            self._advertise()
-        elif event == _IRQ_GATTS_WRITE:
-            conn_handle, value_handle, = data
-            if conn_handle in self._connections and value_handle == self._rx_handle:
-                self._rx_buffer += self._ble.gatts_read(self._rx_handle)
-                if self._handler:
-                    self._handler()
-
+    
+    def _gattsWrite(self, handle, value_handle, data):
+        if value_handle == self._rx_handle:
+            self._rx_buffer += data
+            if self._handler:
+                self._handler()
+    
     def any(self):
         return len(self._rx_buffer)
 
@@ -76,23 +62,15 @@ class BLEUART:
         return result
 
     def write(self, data):
-        for conn_handle in self._connections:
-            self._ble.gatts_notify(conn_handle, self._tx_handle, data)
+        self._bleperipheral.notify(self._tx_handle, data)
 
     def close(self):
-        for conn_handle in self._connections:
-            self._ble.gap_disconnect(conn_handle)
-        self._connections.clear()
-
-    def _advertise(self, interval_us=500000):
-        self._ble.gap_advertise(interval_us, adv_data=self._payload)
-
+        self._bleperipheral.close()
 
 def demo():
     import time
 
-    ble = bluetooth.BLE()
-    uart = BLEUART(ble)
+    uart = BLEUART()
 
     def on_rx():
         print("rx: ", uart.read().decode().strip())

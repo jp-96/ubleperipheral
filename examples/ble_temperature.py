@@ -30,12 +30,13 @@ class BLETemperature:
     def __init__(self, connected, disconnected):
         self._bleperipheral = BLEPeripheral()
         self._bleperipheral.irq(connected,disconnected)
-        ((self._handleTempChar,),) = self._bleperipheral.init(
+        ((self._handleTempChar,),) = self._bleperipheral.build(
             (_ENV_SENSE_SERVICE, ),
-            [_ENV_SENSE_UUID],
-            "upy-temp",
-            _ADV_APPEARANCE_GENERIC_THERMOMETER
+            adv_services=[_ENV_SENSE_UUID],
+            adv_name="upy-temp",
+            adv_appearance=_ADV_APPEARANCE_GENERIC_THERMOMETER
         )
+        self._bleperipheral.advertise()
 
     def set_temperature(self, temp_deg_c, notify=False):
         # Data is sint16 in degrees Celsius with a resolution of 0.01 degrees Celsius.
