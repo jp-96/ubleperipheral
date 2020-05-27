@@ -27,8 +27,8 @@ _ADV_APPEARANCE_GENERIC_THERMOMETER = const(768)
 
 
 class BLETemperature:
-    def __init__(self, connected, disconnected):
-        self._bleperipheral = BLEPeripheral()
+    def __init__(self, connected, disconnected, multi_connections):
+        self._bleperipheral = BLEPeripheral(multi_connections=multi_connections)
         self._bleperipheral.irq(connected,disconnected)
         ((self._handleTempChar,),) = self._bleperipheral.build(
             (_ENV_SENSE_SERVICE, ),
@@ -44,15 +44,15 @@ class BLETemperature:
         self._bleperipheral.write(self._handleTempChar, struct.pack("<h", int(temp_deg_c * 100)), notify)
 
 
-def demo():
+def demo(multi_connections=0):
 
-    def connected(sender, handle):
-        print("Connected: {}".format(handle))
+    def connected(sender, conn_handle):
+        print("Connected: {}".format(conn_handle))
 
-    def disconnected(sender, handle):
-        print("Disconnected: {}".format(handle))
+    def disconnected(sender, conn_handle):
+        print("Disconnected: {}".format(conn_handle))
 
-    temp = BLETemperature(connected, disconnected)
+    temp = BLETemperature(connected, disconnected, multi_connections)
 
     t = 25
     i = 0
