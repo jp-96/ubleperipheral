@@ -2,7 +2,6 @@
 source ~/esp32/micropython/ports/esp32/build-venv/bin/activate
 
 cd /mnt/c/workgit/upy_bleperipheral
-
 ampy --port=/dev/ttyS8 rm main.py
 python sleep.py
 
@@ -18,6 +17,8 @@ ampy --port=/dev/ttyS8 put ble_advertising.py /bleperipheral/ble_advertising.py
 python ../sleep.py
 ampy --port=/dev/ttyS8 put ble_peripheral.py /bleperipheral/ble_peripheral.py
 python ../sleep.py
+ampy --port=/dev/ttyS8 put util.py /bleperipheral/util.py
+python ../sleep.py
 cd ..
 
 cd /mnt/c/workgit/upy_bleperipheral/examples
@@ -32,3 +33,7 @@ python ../sleep.py
 ampy --port=/dev/ttyS8 put ble_uart_repl.py /examples/ble_uart_repl.py
 python ../sleep.py
 cd ..
+
+cd /mnt/c/workgit/upy_bleperipheral
+ampy --port=/dev/ttyS8 put main.py
+python sleep.py

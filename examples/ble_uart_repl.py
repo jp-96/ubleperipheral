@@ -8,8 +8,9 @@ import io
 import os
 import micropython
 import machine
+from micropython import const
 
-from ble_uart_peripheral import BLEUART
+from examples.ble_uart_peripheral import BLEUART
 
 _MP_STREAM_POLL = const(3)
 _MP_STREAM_POLL_RD = const(0x0001)
@@ -75,8 +76,7 @@ class BLEUARTStream(io.IOBase):
 
 
 def start():
-    ble = bluetooth.BLE()
-    uart = BLEUART(ble, name="mpy-repl")
+    uart = BLEUART(name="upy-repl")
     stream = BLEUARTStream(uart)
 
     os.dupterm(stream)
