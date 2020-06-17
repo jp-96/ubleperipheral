@@ -37,7 +37,7 @@ class BLEUART:
             adv_appearance=_ADV_APPEARANCE_GENERIC_COMPUTER
         )
         # Increase the size of the rx buffer and enable append mode.
-        self._bleperipheral.gatts_set_buffer(self._rx_handle, rxbuf, True)
+        self._bleperipheral.setBuffer(self._rx_handle, rxbuf, True)
         self._rx_buffer = bytearray()
         self._bleperipheral.irq(handlerGattsWrite=self._gattsWrite)
         self._bleperipheral.advertise()
