@@ -1,7 +1,12 @@
 '''
 bleperipheral package
-Copyright (c) 2020 jp-96
+    Copyright (c) 2020 jp-96
 '''
+
+import bluetooth
+import micropython
+import uasyncio
+from micropython import const
 
 def _f():
     pass
