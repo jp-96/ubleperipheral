@@ -75,7 +75,7 @@ def demo():
     def on_rx():
         print("rx: ", uart.read().decode().strip())
 
-    uart.irq(handler=on_rx)
+    uart.irq(on_rx)
     nums = [4, 8, 15, 16, 23, 42]
     i = 0
 
