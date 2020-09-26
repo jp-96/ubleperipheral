@@ -28,7 +28,7 @@ class BLEPeripheral:
         self._advertising = False
         self._payload = None
         self.irq()
-        self._ble.irq(handler=self._irq)
+        self._ble.irq(self._irq)
         self._ble.active(True)
     
     def build(self, services_definition, adv_services=None, adv_name="upy-ble", adv_service_data=None, adv_appearance=0, adv_payload=None):        
